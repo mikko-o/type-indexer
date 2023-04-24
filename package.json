@@ -1,0 +1,13 @@
+{
+  "name": "type-indexer",
+  "version": "0.1.0",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@types/pg": "^8.6.6",
+    "ethers": "^5.7.2",
+    "pg": "^8.10.0"
+  }
+}
