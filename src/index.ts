@@ -1,6 +1,6 @@
 import { sleep } from "./utils"
 import { BaseContract, providers } from "ethers";
-import { TypedEvent, TypedEventFilter, TypedListener } from "./types/typechain/common";
+import { TypedEvent, } from "./types/typechain/common";
 import { BaseProvider } from '@ethersproject/providers'
 import { ClientBase, Pool } from "pg";
 import { ProgressReporter } from "./utils/ProgressReporter";
@@ -8,6 +8,8 @@ import { ProgressReporter } from "./utils/ProgressReporter";
 export type IndexerTask = (start: number, end: number) => Promise<void>
 
 export type IndexerEndCallback = (endBlock: number) => void | Promise<void>
+
+export type { AvailFilterKeys, GetFilter } from './types'
 
 interface IndexSettings {
   checkpointInterval?: number
@@ -35,15 +37,6 @@ export async function _index(provider: BaseProvider, startBlock: number, batchSi
   await onEnd(currentBlock - 1)
 }
 
-type AvailFilterKeys<C extends BaseContract> = keyof C['filters']
-type GetFilterFunction<C extends BaseContract, F extends keyof C['filters']> = C['filters'][F]
-
-type GetFilter<C extends BaseContract, F extends keyof C['filters']> = ReturnType<GetFilterFunction<C, F>>;
-type GetEventFromFilter<C extends BaseContract, F extends keyof C['filters']> = GetFilter<C, F> extends TypedEventFilter<infer _TEvent extends TypedEvent> ? _TEvent : unknown;
-
-
-type GetEventArgs<C extends BaseContract, F extends keyof C['filters']> = GetEventFromFilter<C, F> extends TypedEvent<infer A extends Array<any>, infer B> ? [A, B] : never
-export type GetEvent<C extends BaseContract, F extends AvailFilterKeys<C>> = TypedEvent<GetEventArgs<C, F>[0], GetEventArgs<C, F>[1]>
 
 export interface IndexerSettings {
   startBlock?: number
@@ -55,10 +48,6 @@ export interface IndexerSettings {
   progressReportInterval?: number
 }
 
-type GetMultiEventIndexerFilterObj<C extends BaseContract> = {
-  [F in keyof C['filters']]: (e: GetEvent<C, F>, contractAddress: string) => void | Promise<void>
-}
-export type Filters<C extends BaseContract> = { [K in keyof GetMultiEventIndexerFilterObj<C>]+?: GetMultiEventIndexerFilterObj<C>[K] }
 
 class InitialIndexStatus {
   private done: boolean = false
@@ -104,9 +93,11 @@ class InactivityMonitor {
   }
 }
 
-abstract class IndexerBase<TypedContract extends BaseContract> {
+
+type FiltersBase = { [name: string]: (event: TypedEvent, contractName: string) => void | Promise<void> }
+abstract class IndexerBase<Filters> {
   // Event filters
-  abstract filters: Filters<TypedContract>
+  abstract filters: Filters
   // Will run at the end of each batch of blocks indexed 
   abstract onIndexEnd: () => Promise<void>
   // An optional event listener which will start when previous blocks have been indexed
@@ -117,7 +108,7 @@ abstract class IndexerBase<TypedContract extends BaseContract> {
   abstract name: string
 }
 
-export abstract class Indexer<TypedContract extends BaseContract> extends IndexerBase<TypedContract> {
+export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<Filters> {
   static initialIndexStatus = new InitialIndexStatus()
   private static client: ClientBase | Pool | undefined = undefined
   private static connectProvider: (() => BaseProvider) | undefined = undefined
@@ -136,10 +127,10 @@ export abstract class Indexer<TypedContract extends BaseContract> extends Indexe
     return this.connectProvider()
   }
 
-  contracts: TypedContract[]
+  contracts: BaseContract[]
   settings?: IndexerSettings
 
-  constructor(contracts: TypedContract[], settings?: IndexerSettings) {
+  constructor(contracts: BaseContract[], settings?: IndexerSettings) {
     super()
     if (!Indexer.client || !Indexer.connectProvider) {
       throw new Error('Uninitialized')
@@ -252,16 +243,15 @@ export abstract class Indexer<TypedContract extends BaseContract> extends Indexe
   }
 }
 
-type getEventListenerFilterObj<C extends BaseContract> = {
-  [F in keyof C['filters']]: GetEvent<C, F> extends TypedEvent<infer A extends Array<any>, infer B> ? (listenerArg: [...A, TypedEvent<A & B>], contractAddress: string) => void | Promise<void> : never
+type ListenerFiltersBase = {
+  [k: string]: (args: any[], contractAddress: string) => void | Promise<void>
 }
 
-export type getListenerFiltersType<C extends BaseContract> = { [K in keyof getEventListenerFilterObj<C>]+?: getEventListenerFilterObj<C>[K] }
 
-export abstract class Listener<TypedContract extends BaseContract> {
-  abstract filters: getListenerFiltersType<TypedContract>
+export abstract class Listener<ListenerFilters extends ListenerFiltersBase> {
+  abstract filters: ListenerFilters
 
-  start = (contracts: TypedContract[]) => {
+  start = (contracts: BaseContract[]) => {
     contracts.forEach(c => {
       Object.entries(this.filters).forEach(([key, onEvent]) => {
         const filter = c.filters[key]()
