@@ -10,7 +10,7 @@ class BandwidthChangedIndexer extends Indexer<LayerCakeTools, BandwidthChangedEv
   name: 'BandwidthChanged' = 'BandwidthChanged'
   filterName: 'BandwidthChanged' = 'BandwidthChanged'
 
-  processEvent = (e: BandwidthChangedEvent.Log, c: BaseContract) => {
+  processEvent = (e: BandwidthChangedEvent.Log) => {
     const { added, amount } = e.args
     return [added, amount] as const
   }

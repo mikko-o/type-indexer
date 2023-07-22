@@ -1,7 +1,5 @@
 import { sleep } from "./utils"
 import { BaseContract, Provider, } from "ethers";
-import { TypedEventLog, } from "./types/typechain/common";
-//import { BaseProvider } from '@ethersproject/providers'
 import { ClientBase, Pool } from "pg";
 import { ProgressReporter } from "./utils/ProgressReporter";
 import { readFileSync } from 'fs'
@@ -46,6 +44,7 @@ export interface IndexerSettings {
   batchSize?: number
   checkpointInterval?: number
   progressReportInterval?: number
+  indexInterval: number
 }
 
 
@@ -97,7 +96,7 @@ class InactivityMonitor {
 //type FiltersBase = { [name: string]: (event: TypedEventLog, contractName: string) => void | Promise<void> }
 abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInputType> {
   abstract filterName: keyof TypedContract['filters']
-  abstract processEvent: (e: EventLog, c: BaseContract) => DbInputType
+  abstract processEvent: (e: EventLog) => DbInputType
   abstract store: (data: Array<DbInputType>) => Promise<void>
   // Will run at the end of each batch of blocks indexed 
   //abstract onIndexEnd: () => Promise<void>
@@ -132,15 +131,17 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     return this.connectProvider()
   }
 
-  contracts: BaseContract[]
+  contract: BaseContract
   settings?: IndexerSettings
 
-  constructor(contracts: BaseContract[], settings?: IndexerSettings) {
+  defaultIndexInterval = 30 * 1000
+
+  constructor(contract: BaseContract, settings?: IndexerSettings) {
     super()
     if (!Indexer.client || !Indexer.connectProvider) {
       throw new Error('Uninitialized')
     }
-    this.contracts = contracts
+    this.contract = contract
     this.settings = settings
   }
 
@@ -149,28 +150,28 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
   }
 
   async index() {
-    if (this.contracts.length === 0) return
+    const address = await this.contract.getAddress()
 
     const onEnd = async (b: number) => {
       //await this.onIndexEnd()
       //this.clearState()
       if (this.settings?.updateLastIndexedBlock !== false) {
-        this.updateLastIndexedBlock(b)
-        this.refreshLastUpdatedAt()
+        await this.updateLastIndexedBlock(address, b)
+        await this.refreshLastUpdatedAt(address)
       }
       Indexer.inactivityMonitor.logActivity()
     }
     let start = this.settings?.startBlock
     if (start === undefined) {
       //const last = await this.getLastIndexedBlock()
-      start = await this.getLastIndexedBlock() + 1
+      start = await this.getLastIndexedBlock(address) + 1
       if (this.settings?.minIndexableBlock && start < this.settings.minIndexableBlock) {
         start = this.settings.minIndexableBlock
       }
     }
 
-    console.log(`\n${this.name ?? 'Unnamed indexer'}: indexing from block ${start}`)
-    console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
+    console.log(`\n${(this.name ?? 'Unnamed indexer') + ' ' + address}: indexing from block ${start}`)
+    //console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
 
     const initialTask = this.getTask()
     await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
@@ -180,14 +181,25 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     // Periodically index with query filter
     // Only the indexer should update last indexed block (not the listener)
     const indexPeriodically = async () => {
+      const address = await this.contract.getAddress()
       while (true) {
-        await sleep(60 * 1000)
-        if (!Indexer.initialIndexStatus.isDone()) continue
-        start = await this.getLastIndexedBlock()
-        console.log(`\n${this.name ?? 'Unnamed indexer'}: indexing from block ${start}`)
-        console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
+        const startTs = Number(new Date())
+
+        //await sleep(60 * 1000)
+        if (!Indexer.initialIndexStatus.isDone()) {
+          await sleep(this.settings?.indexInterval ?? this.defaultIndexInterval)
+          continue
+        }
+        start = await this.getLastIndexedBlock(address)
+        console.log(`\n${(this.name ?? 'Unnamed indexer') + ' ' + address}: indexing from block ${start}`)
+        //console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
         const task = this.getTask()
         await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, task, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
+
+        const endTs = Number(new Date())
+        const duration = endTs - startTs
+        const wait = (this.settings?.indexInterval ?? this.defaultIndexInterval) - duration
+        await sleep(wait)
       }
     }
 
@@ -198,60 +210,58 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     try {
       // Reconnect to make sure the connection is alive
       const provider = Indexer.connectAndGetProvider()
-      const contracts = this.contracts.map(x => x.connect({ provider }))
+      const contract = this.contract.connect({ provider })
+      const filter = contract.filters[this.filterName as string]()
+      const events = await contract.queryFilter(filter, start, end) as EventLog[]
+      //console.log(c.address, events.length)
+      const output = await Promise.all(
+        events.map(e => this.processEvent(e))
+      )
+
+      await this.store(output)
+
+      /*
       await Promise.all(
-        contracts.map(async c => {
-          const filter = c.filters[this.filterName as string]()
-          const events = await c.queryFilter(filter, start, end) as EventLog[]
+        Object.entries(this.filters).map(async ([filterKey, onEvent]) => {
+          const filter = c.filters[filterKey]()
+          type E = Parameters<typeof onEvent>[0]
+          const events = await c.queryFilter(filter, start, end) as E[]
           //console.log(c.address, events.length)
-          const output = await Promise.all(
-            events.map(e => this.processEvent(e, c))
-          )
-
-          await this.store(output)
-
-          /*
           await Promise.all(
-            Object.entries(this.filters).map(async ([filterKey, onEvent]) => {
-              const filter = c.filters[filterKey]()
-              type E = Parameters<typeof onEvent>[0]
-              const events = await c.queryFilter(filter, start, end) as E[]
-              //console.log(c.address, events.length)
-              await Promise.all(
-                events.map(e => onEvent(e, c.address))
-              )
-            })
+            events.map(e => onEvent(e, c.address))
           )
-          */
         })
       )
+      */
     } catch (e) {
       console.log("Error on indexer task", this.name, e)
       throw e
     }
   }
 
-  getLastIndexedBlock: () => Promise<number> = async () => {
+  getIndexerId = (contractAddress: string) => this.name + contractAddress
+
+  getLastIndexedBlock: (contractAddress: string) => Promise<number> = async (contractAddress) => {
     const q = await this.client.query(`
       SELECT * FROM last_indexed_blocks
       WHERE indexer_name = $1
-    `, [this.name])
+    `, [this.getIndexerId(contractAddress)])
 
     if (q.rowCount === 0) return 0
     else return Number(q.rows[0].block)
   }
 
-  updateLastIndexedBlock: (b: number) => Promise<void> = async b => {
+  updateLastIndexedBlock: (contractAddress: string, b: number) => Promise<void> = async (contractAddress, b) => {
     await this.client.query(`
       INSERT INTO
         last_indexed_blocks (indexer_name, block)
       VALUES ($1, $2)
       ON CONFLICT (indexer_name) DO UPDATE
       SET block = EXCLUDED.block
-    `, [this.name, b])
+    `, [this.getIndexerId(contractAddress), b])
   }
 
-  refreshLastUpdatedAt = async () => {
+  refreshLastUpdatedAt = async (contractName: string) => {
     await this.client.query(`
       INSERT INTO last_updated_at (id) VALUES ($1)
       ON CONFLICT (id) DO UPDATE SET ts = NOW()
