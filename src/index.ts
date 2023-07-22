@@ -1,9 +1,10 @@
 import { sleep } from "./utils"
-import { BaseContract, providers } from "ethers";
-import { TypedEvent, } from "./types/typechain/common";
-import { BaseProvider } from '@ethersproject/providers'
+import { BaseContract, Provider, } from "ethers";
+import { TypedEventLog, } from "./types/typechain/common";
+//import { BaseProvider } from '@ethersproject/providers'
 import { ClientBase, Pool } from "pg";
 import { ProgressReporter } from "./utils/ProgressReporter";
+import { readFileSync } from 'fs'
 
 export type IndexerTask = (start: number, end: number) => Promise<void>
 
@@ -16,7 +17,7 @@ interface IndexSettings {
   progressReportInterval?: number
 }
 
-export async function _index(provider: BaseProvider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings) {
+export async function _index(provider: Provider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings) {
   let currentBlock = startBlock
   const progressReporter = new ProgressReporter(startBlock, await provider.getBlockNumber(), settings?.progressReportInterval ?? 500000)
   const checkpointInterval = settings?.checkpointInterval ?? 1000000
@@ -36,7 +37,6 @@ export async function _index(provider: BaseProvider, startBlock: number, batchSi
   progressReporter.update(currentBlock - 1)
   await onEnd(currentBlock - 1)
 }
-
 
 export interface IndexerSettings {
   startBlock?: number
@@ -94,28 +94,33 @@ class InactivityMonitor {
 }
 
 
-type FiltersBase = { [name: string]: (event: TypedEvent, contractName: string) => void | Promise<void> }
-abstract class IndexerBase<Filters> {
-  // Event filters
-  abstract filters: Filters
+//type FiltersBase = { [name: string]: (event: TypedEventLog, contractName: string) => void | Promise<void> }
+abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInputType> {
+  abstract filterName: keyof TypedContract['filters']
+  abstract processEvent: (e: EventLog, c: BaseContract) => DbInputType
+  abstract store: (data: Array<DbInputType>) => Promise<void>
   // Will run at the end of each batch of blocks indexed 
-  abstract onIndexEnd: () => Promise<void>
+  //abstract onIndexEnd: () => Promise<void>
   // An optional event listener which will start when previous blocks have been indexed
-  abstract startEventListener?: () => void | Promise<void>
+  //abstract startEventListener?: () => void | Promise<void>
   // Should be defined to clear any temporary data allocated when indexing a batch of blocks
-  abstract clearState: () => void
+  // abstract clearState: () => void
+
   // Unique name for the indexer
   abstract name: string
 }
 
-export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<Filters> {
+export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbInputType = any> extends IndexerBase<TypedContract, EventLog, DbInputType> {
   static initialIndexStatus = new InitialIndexStatus()
   private static client: ClientBase | Pool | undefined = undefined
-  private static connectProvider: (() => BaseProvider) | undefined = undefined
+  private static connectProvider: (() => Provider) | undefined = undefined
   private static inactivityMonitor = new InactivityMonitor(1000 * 60 * 10)
   static setClient = (c: ClientBase | Pool) => { this.client = c }
-  static initialize = (settings: { client: ClientBase | Pool, connectProvider: () => providers.BaseProvider }) => {
+  static initialize = async (settings: { client: ClientBase | Pool, connectProvider: () => Provider }) => {
     this.client = settings.client
+    // create indexer tables
+    const create = readFileSync('src/db/schema.sql', { encoding: 'utf-8' })
+    await settings.client.query(create)
     this.connectProvider = settings.connectProvider
   }
   static getClient = () => {
@@ -147,8 +152,8 @@ export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<F
     if (this.contracts.length === 0) return
 
     const onEnd = async (b: number) => {
-      await this.onIndexEnd()
-      this.clearState()
+      //await this.onIndexEnd()
+      //this.clearState()
       if (this.settings?.updateLastIndexedBlock !== false) {
         this.updateLastIndexedBlock(b)
         this.refreshLastUpdatedAt()
@@ -165,12 +170,12 @@ export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<F
     }
 
     console.log(`\n${this.name ?? 'Unnamed indexer'}: indexing from block ${start}`)
-    console.log(this.contracts.map(x => `${x.address.substring(0, 8)}...`).join(', '))
+    console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
 
     const initialTask = this.getTask()
     await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
 
-    if (this.startEventListener) this.startEventListener()
+    //if (this.startEventListener) this.startEventListener()
 
     // Periodically index with query filter
     // Only the indexer should update last indexed block (not the listener)
@@ -180,7 +185,7 @@ export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<F
         if (!Indexer.initialIndexStatus.isDone()) continue
         start = await this.getLastIndexedBlock()
         console.log(`\n${this.name ?? 'Unnamed indexer'}: indexing from block ${start}`)
-        console.log(this.contracts.map(x => `${x.address.substring(0, 8)}...`).join(', '))
+        console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
         const task = this.getTask()
         await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, task, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
       }
@@ -193,9 +198,19 @@ export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<F
     try {
       // Reconnect to make sure the connection is alive
       const provider = Indexer.connectAndGetProvider()
-      const contracts = this.contracts.map(x => x.connect(provider))
+      const contracts = this.contracts.map(x => x.connect({ provider }))
       await Promise.all(
         contracts.map(async c => {
+          const filter = c.filters[this.filterName as string]()
+          const events = await c.queryFilter(filter, start, end) as EventLog[]
+          //console.log(c.address, events.length)
+          const output = await Promise.all(
+            events.map(e => this.processEvent(e, c))
+          )
+
+          await this.store(output)
+
+          /*
           await Promise.all(
             Object.entries(this.filters).map(async ([filterKey, onEvent]) => {
               const filter = c.filters[filterKey]()
@@ -207,6 +222,7 @@ export abstract class Indexer<Filters extends FiltersBase> extends IndexerBase<F
               )
             })
           )
+          */
         })
       )
     } catch (e) {
@@ -248,6 +264,7 @@ type ListenerFiltersBase = {
 }
 
 
+/*
 export abstract class Listener<ListenerFilters extends ListenerFiltersBase> {
   abstract filters: ListenerFilters
 
@@ -260,3 +277,4 @@ export abstract class Listener<ListenerFilters extends ListenerFiltersBase> {
     })
   }
 }
+*/
