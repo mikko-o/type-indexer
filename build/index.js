@@ -156,67 +156,57 @@ var IndexerBase = /** @class */ (function () {
 }());
 var Indexer = exports.Indexer = /** @class */ (function (_super) {
     __extends(Indexer, _super);
-    function Indexer(contracts, settings) {
+    function Indexer(contract, settings) {
         var _this = _super.call(this) || this;
+        _this.defaultIndexInterval = 30 * 1000;
         _this.getTask = function () { return function (start, end) { return __awaiter(_this, void 0, void 0, function () {
-            var provider_1, contracts, e_1;
+            var provider, contract, filter, events, output, e_1;
             var _this = this;
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0:
-                        _b.trys.push([0, 2, , 3]);
-                        provider_1 = Indexer.connectAndGetProvider();
-                        contracts = this.contracts.map(function (x) { return x.connect({ provider: provider_1 }); });
-                        return [4 /*yield*/, Promise.all(contracts.map(function (c) { return __awaiter(_this, void 0, void 0, function () {
-                                var filter, events, output;
-                                var _this = this;
-                                return __generator(this, function (_b) {
-                                    switch (_b.label) {
-                                        case 0:
-                                            filter = c.filters[this.filterName]();
-                                            return [4 /*yield*/, c.queryFilter(filter, start, end)];
-                                        case 1:
-                                            events = _b.sent();
-                                            return [4 /*yield*/, Promise.all(events.map(function (e) { return _this.processEvent(e, c); }))];
-                                        case 2:
-                                            output = _b.sent();
-                                            return [4 /*yield*/, this.store(output)
-                                                /*
-                                                await Promise.all(
-                                                  Object.entries(this.filters).map(async ([filterKey, onEvent]) => {
-                                                    const filter = c.filters[filterKey]()
-                                                    type E = Parameters<typeof onEvent>[0]
-                                                    const events = await c.queryFilter(filter, start, end) as E[]
-                                                    //console.log(c.address, events.length)
-                                                    await Promise.all(
-                                                      events.map(e => onEvent(e, c.address))
-                                                    )
-                                                  })
-                                                )
-                                                */
-                                            ];
-                                        case 3:
-                                            _b.sent();
-                                            return [2 /*return*/];
-                                    }
-                                });
-                            }); }))];
+                        _b.trys.push([0, 4, , 5]);
+                        provider = Indexer.connectAndGetProvider();
+                        contract = this.contract.connect({ provider: provider });
+                        filter = contract.filters[this.filterName]();
+                        return [4 /*yield*/, contract.queryFilter(filter, start, end)];
                     case 1:
-                        _b.sent();
-                        return [3 /*break*/, 3];
+                        events = _b.sent();
+                        return [4 /*yield*/, Promise.all(events.map(function (e) { return _this.processEvent(e); }))];
                     case 2:
+                        output = _b.sent();
+                        return [4 /*yield*/, this.store(output)
+                            /*
+                            await Promise.all(
+                              Object.entries(this.filters).map(async ([filterKey, onEvent]) => {
+                                const filter = c.filters[filterKey]()
+                                type E = Parameters<typeof onEvent>[0]
+                                const events = await c.queryFilter(filter, start, end) as E[]
+                                //console.log(c.address, events.length)
+                                await Promise.all(
+                                  events.map(e => onEvent(e, c.address))
+                                )
+                              })
+                            )
+                            */
+                        ];
+                    case 3:
+                        _b.sent();
+                        return [3 /*break*/, 5];
+                    case 4:
                         e_1 = _b.sent();
                         console.log("Error on indexer task", this.name, e_1);
                         throw e_1;
-                    case 3: return [2 /*return*/];
+                    case 5: return [2 /*return*/];
                 }
             });
         }); }; };
-        _this.getLastIndexedBlock = function () { return __awaiter(_this, void 0, void 0, function () {
+        _this.getIndexerId = function (contractAddress) { return _this.name + contractAddress; };
+        _this.getLastIndexedBlock = function (contractAddress) { return __awaiter(_this, void 0, void 0, function () {
             var q;
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.client.query("\n      SELECT * FROM last_indexed_blocks\n      WHERE indexer_name = $1\n    ", [this.name])];
+                    case 0: return [4 /*yield*/, this.client.query("\n      SELECT * FROM last_indexed_blocks\n      WHERE indexer_name = $1\n    ", [this.getIndexerId(contractAddress)])];
                     case 1:
                         q = _b.sent();
                         if (q.rowCount === 0)
@@ -227,17 +217,17 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                 }
             });
         }); };
-        _this.updateLastIndexedBlock = function (b) { return __awaiter(_this, void 0, void 0, function () {
+        _this.updateLastIndexedBlock = function (contractAddress, b) { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_b) {
                 switch (_b.label) {
-                    case 0: return [4 /*yield*/, this.client.query("\n      INSERT INTO\n        last_indexed_blocks (indexer_name, block)\n      VALUES ($1, $2)\n      ON CONFLICT (indexer_name) DO UPDATE\n      SET block = EXCLUDED.block\n    ", [this.name, b])];
+                    case 0: return [4 /*yield*/, this.client.query("\n      INSERT INTO\n        last_indexed_blocks (indexer_name, block)\n      VALUES ($1, $2)\n      ON CONFLICT (indexer_name) DO UPDATE\n      SET block = EXCLUDED.block\n    ", [this.getIndexerId(contractAddress), b])];
                     case 1:
                         _b.sent();
                         return [2 /*return*/];
                 }
             });
         }); };
-        _this.refreshLastUpdatedAt = function () { return __awaiter(_this, void 0, void 0, function () {
+        _this.refreshLastUpdatedAt = function (contractName) { return __awaiter(_this, void 0, void 0, function () {
             return __generator(this, function (_b) {
                 switch (_b.label) {
                     case 0: return [4 /*yield*/, this.client.query("\n      INSERT INTO last_updated_at (id) VALUES ($1)\n      ON CONFLICT (id) DO UPDATE SET ts = NOW()\n    ", [this.name])];
@@ -250,7 +240,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
         if (!Indexer.client || !Indexer.connectProvider) {
             throw new Error('Uninitialized');
         }
-        _this.contracts = contracts;
+        _this.contract = contract;
         _this.settings = settings;
         return _this;
     }
@@ -264,49 +254,44 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
     Indexer.prototype.index = function () {
         var _b, _c, _d, _e, _f, _g, _h;
         return __awaiter(this, void 0, void 0, function () {
-            var onEnd, start, _j, _k, initialTask, indexPeriodically;
+            var address, onEnd, start, initialTask, indexPeriodically;
             var _this = this;
-            return __generator(this, function (_l) {
-                switch (_l.label) {
-                    case 0:
-                        if (this.contracts.length === 0)
-                            return [2 /*return*/];
+            return __generator(this, function (_j) {
+                switch (_j.label) {
+                    case 0: return [4 /*yield*/, this.contract.getAddress()];
+                    case 1:
+                        address = _j.sent();
                         onEnd = function (b) { return __awaiter(_this, void 0, void 0, function () {
                             var _b;
                             return __generator(this, function (_c) {
-                                //await this.onIndexEnd()
-                                //this.clearState()
-                                if (((_b = this.settings) === null || _b === void 0 ? void 0 : _b.updateLastIndexedBlock) !== false) {
-                                    this.updateLastIndexedBlock(b);
-                                    this.refreshLastUpdatedAt();
+                                switch (_c.label) {
+                                    case 0:
+                                        if (!(((_b = this.settings) === null || _b === void 0 ? void 0 : _b.updateLastIndexedBlock) !== false)) return [3 /*break*/, 3];
+                                        return [4 /*yield*/, this.updateLastIndexedBlock(address, b)];
+                                    case 1:
+                                        _c.sent();
+                                        return [4 /*yield*/, this.refreshLastUpdatedAt(address)];
+                                    case 2:
+                                        _c.sent();
+                                        _c.label = 3;
+                                    case 3:
+                                        Indexer.inactivityMonitor.logActivity();
+                                        return [2 /*return*/];
                                 }
-                                Indexer.inactivityMonitor.logActivity();
-                                return [2 /*return*/];
                             });
                         }); };
                         start = (_b = this.settings) === null || _b === void 0 ? void 0 : _b.startBlock;
-                        if (!(start === undefined)) return [3 /*break*/, 2];
-                        return [4 /*yield*/, this.getLastIndexedBlock()];
-                    case 1:
+                        if (!(start === undefined)) return [3 /*break*/, 3];
+                        return [4 /*yield*/, this.getLastIndexedBlock(address)];
+                    case 2:
                         //const last = await this.getLastIndexedBlock()
-                        start = (_l.sent()) + 1;
+                        start = (_j.sent()) + 1;
                         if (((_c = this.settings) === null || _c === void 0 ? void 0 : _c.minIndexableBlock) && start < this.settings.minIndexableBlock) {
                             start = this.settings.minIndexableBlock;
                         }
-                        _l.label = 2;
-                    case 2:
-                        console.log("\n".concat((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer', ": indexing from block ").concat(start));
-                        _k = (_j = console).log;
-                        return [4 /*yield*/, Promise.all(this.contracts.map(function (x) { return __awaiter(_this, void 0, void 0, function () { var _b; return __generator(this, function (_c) {
-                                switch (_c.label) {
-                                    case 0:
-                                        _b = "".concat;
-                                        return [4 /*yield*/, x.getAddress()];
-                                    case 1: return [2 /*return*/, _b.apply("", [(_c.sent()).substring(0, 8), "..."])];
-                                }
-                            }); }); }).join(', '))];
+                        _j.label = 3;
                     case 3:
-                        _k.apply(_j, [_l.sent()]);
+                        console.log("\n".concat(((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer') + ' ' + address, ": indexing from block ").concat(start));
                         initialTask = this.getTask();
                         return [4 /*yield*/, _index(Indexer.connectAndGetProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, initialTask, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })
                             //if (this.startEventListener) this.startEventListener()
@@ -314,41 +299,40 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                             // Only the indexer should update last indexed block (not the listener)
                         ];
                     case 4:
-                        _l.sent();
+                        _j.sent();
                         indexPeriodically = function () { return __awaiter(_this, void 0, void 0, function () {
-                            var _b, _c, task;
-                            var _this = this;
-                            var _d, _e, _f, _g, _h;
-                            return __generator(this, function (_j) {
-                                switch (_j.label) {
-                                    case 0:
-                                        if (!true) return [3 /*break*/, 5];
-                                        return [4 /*yield*/, (0, utils_1.sleep)(60 * 1000)];
+                            var address, startTs, task, endTs, duration, wait;
+                            var _b, _c, _d, _e, _f, _g, _h, _j, _k;
+                            return __generator(this, function (_l) {
+                                switch (_l.label) {
+                                    case 0: return [4 /*yield*/, this.contract.getAddress()];
                                     case 1:
-                                        _j.sent();
-                                        if (!Indexer.initialIndexStatus.isDone())
-                                            return [3 /*break*/, 0];
-                                        return [4 /*yield*/, this.getLastIndexedBlock()];
+                                        address = _l.sent();
+                                        _l.label = 2;
                                     case 2:
-                                        start = _j.sent();
-                                        console.log("\n".concat((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer', ": indexing from block ").concat(start));
-                                        _c = (_b = console).log;
-                                        return [4 /*yield*/, Promise.all(this.contracts.map(function (x) { return __awaiter(_this, void 0, void 0, function () { var _b; return __generator(this, function (_c) {
-                                                switch (_c.label) {
-                                                    case 0:
-                                                        _b = "".concat;
-                                                        return [4 /*yield*/, x.getAddress()];
-                                                    case 1: return [2 /*return*/, _b.apply("", [(_c.sent()).substring(0, 8), "..."])];
-                                                }
-                                            }); }); }).join(', '))];
+                                        if (!true) return [3 /*break*/, 8];
+                                        startTs = Number(new Date());
+                                        if (!!Indexer.initialIndexStatus.isDone()) return [3 /*break*/, 4];
+                                        return [4 /*yield*/, (0, utils_1.sleep)((_c = (_b = this.settings) === null || _b === void 0 ? void 0 : _b.indexInterval) !== null && _c !== void 0 ? _c : this.defaultIndexInterval)];
                                     case 3:
-                                        _c.apply(_b, [_j.sent()]);
+                                        _l.sent();
+                                        return [3 /*break*/, 2];
+                                    case 4: return [4 /*yield*/, this.getLastIndexedBlock(address)];
+                                    case 5:
+                                        start = _l.sent();
+                                        console.log("\n".concat(((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer') + ' ' + address, ": indexing from block ").concat(start));
                                         task = this.getTask();
                                         return [4 /*yield*/, _index(Indexer.connectAndGetProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, task, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })];
-                                    case 4:
-                                        _j.sent();
-                                        return [3 /*break*/, 0];
-                                    case 5: return [2 /*return*/];
+                                    case 6:
+                                        _l.sent();
+                                        endTs = Number(new Date());
+                                        duration = endTs - startTs;
+                                        wait = ((_k = (_j = this.settings) === null || _j === void 0 ? void 0 : _j.indexInterval) !== null && _k !== void 0 ? _k : this.defaultIndexInterval) - duration;
+                                        return [4 /*yield*/, (0, utils_1.sleep)(wait)];
+                                    case 7:
+                                        _l.sent();
+                                        return [3 /*break*/, 2];
+                                    case 8: return [2 /*return*/];
                                 }
                             });
                         }); };

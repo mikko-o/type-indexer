@@ -62,7 +62,7 @@ var BandwidthChangedIndexer = /** @class */ (function (_super) {
         var _this = _super !== null && _super.apply(this, arguments) || this;
         _this.name = 'BandwidthChanged';
         _this.filterName = 'BandwidthChanged';
-        _this.processEvent = function (e, c) {
+        _this.processEvent = function (e) {
             var _a = e.args, added = _a.added, amount = _a.amount;
             return [added, amount];
         };

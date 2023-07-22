@@ -16,6 +16,7 @@ export interface IndexerSettings {
     batchSize?: number;
     checkpointInterval?: number;
     progressReportInterval?: number;
+    indexInterval: number;
 }
 declare class InitialIndexStatus {
     private done;
@@ -24,7 +25,7 @@ declare class InitialIndexStatus {
 }
 declare abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInputType> {
     abstract filterName: keyof TypedContract['filters'];
-    abstract processEvent: (e: EventLog, c: BaseContract) => DbInputType;
+    abstract processEvent: (e: EventLog) => DbInputType;
     abstract store: (data: Array<DbInputType>) => Promise<void>;
     abstract name: string;
 }
@@ -40,13 +41,15 @@ export declare abstract class Indexer<TypedContract extends BaseContract, EventL
     }) => Promise<void>;
     static getClient: () => ClientBase | Pool;
     static connectAndGetProvider: () => Provider;
-    contracts: BaseContract[];
+    contract: BaseContract;
     settings?: IndexerSettings;
-    constructor(contracts: BaseContract[], settings?: IndexerSettings);
+    defaultIndexInterval: number;
+    constructor(contract: BaseContract, settings?: IndexerSettings);
     get client(): ClientBase | Pool;
     index(): Promise<void>;
     private getTask;
-    getLastIndexedBlock: () => Promise<number>;
-    updateLastIndexedBlock: (b: number) => Promise<void>;
-    refreshLastUpdatedAt: () => Promise<void>;
+    getIndexerId: (contractAddress: string) => string;
+    getLastIndexedBlock: (contractAddress: string) => Promise<number>;
+    updateLastIndexedBlock: (contractAddress: string, b: number) => Promise<void>;
+    refreshLastUpdatedAt: (contractName: string) => Promise<void>;
 }
