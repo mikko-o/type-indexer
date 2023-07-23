@@ -1,4 +1,4 @@
-import { BaseContract, Provider } from "ethers";
+import { BaseContract, Provider, WebSocketProvider } from "ethers";
 import { ClientBase, Pool } from "pg";
 export type IndexerTask = (start: number, end: number) => Promise<void>;
 export type IndexerEndCallback = (endBlock: number) => void | Promise<void>;
@@ -7,7 +7,7 @@ interface IndexSettings {
     checkpointInterval?: number;
     progressReportInterval?: number;
 }
-export declare function _index(provider: Provider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings): Promise<void>;
+export declare function _index(provider: Provider | WebSocketProvider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings): Promise<void>;
 export interface IndexerSettings {
     startBlock?: number;
     minIndexableBlock?: number;
