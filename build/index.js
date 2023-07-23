@@ -278,7 +278,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                     case 2:
                         //const last = await this.getLastIndexedBlock()
                         start = (_j.sent()) + 1;
-                        if (((_c = this.settings) === null || _c === void 0 ? void 0 : _c.minIndexableBlock) && start < this.settings.minIndexableBlock) {
+                        if (((_c = this.settings) === null || _c === void 0 ? void 0 : _c.minIndexableBlock) && (start || 0) < this.settings.minIndexableBlock) {
                             start = this.settings.minIndexableBlock;
                         }
                         _j.label = 3;
