@@ -1,5 +1,5 @@
 import { sleep } from "./utils"
-import { BaseContract, Provider, } from "ethers";
+import { BaseContract, Provider, WebSocketProvider, } from "ethers";
 import { ClientBase, Pool } from "pg";
 import { ProgressReporter } from "./utils/ProgressReporter";
 import { readFileSync } from 'fs'
@@ -15,7 +15,7 @@ interface IndexSettings {
   progressReportInterval?: number
 }
 
-export async function _index(provider: Provider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings) {
+export async function _index(provider: Provider | WebSocketProvider, startBlock: number, batchSize: number, task: IndexerTask, onEnd: IndexerEndCallback, settings?: IndexSettings) {
   let currentBlock = startBlock
   const progressReporter = new ProgressReporter(startBlock, await provider.getBlockNumber(), settings?.progressReportInterval ?? 500000)
   const checkpointInterval = settings?.checkpointInterval ?? 1000000
