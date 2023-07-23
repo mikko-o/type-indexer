@@ -159,6 +159,31 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
     function Indexer(contract, connectAndGetProvider, client, settings) {
         var _this = _super.call(this) || this;
         _this.defaultIndexInterval = 30 * 1000;
+        _this.startEventListener = function () {
+            _this.contract.on(_this.contract.filters[_this.filterName](), function () {
+                var args = [];
+                for (var _i = 0; _i < arguments.length; _i++) {
+                    args[_i] = arguments[_i];
+                }
+                return __awaiter(_this, void 0, void 0, function () {
+                    var e, data;
+                    return __generator(this, function (_b) {
+                        switch (_b.label) {
+                            case 0:
+                                e = args[args.length - 1];
+                                console.log("New event detected", e);
+                                return [4 /*yield*/, this.processEvent(e)];
+                            case 1:
+                                data = _b.sent();
+                                return [4 /*yield*/, this.store([data])];
+                            case 2:
+                                _b.sent();
+                                return [2 /*return*/];
+                        }
+                    });
+                });
+            });
+        };
         _this.getTask = function () { return function (start, end) { return __awaiter(_this, void 0, void 0, function () {
             var provider, contract, filter, events, output, e_1;
             var _this = this;
@@ -287,11 +312,11 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                         initialTask = this.getTask();
                         return [4 /*yield*/, _index(this.getProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, initialTask, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })
                             //if (this.startEventListener) this.startEventListener()
-                            // Periodically index with query filter
-                            // Only the indexer should update last indexed block (not the listener)
                         ];
                     case 4:
                         _j.sent();
+                        //if (this.startEventListener) this.startEventListener()
+                        this.startEventListener();
                         indexPeriodically = function () { return __awaiter(_this, void 0, void 0, function () {
                             var address, startTs, task, endTs, duration, wait;
                             var _b, _c, _d, _e, _f, _g, _h, _j, _k;
