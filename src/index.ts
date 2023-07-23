@@ -131,7 +131,12 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     this.client = client
   }
 
+  private eventListenerDisabled = false
+  disableEventListener = () => this.eventListenerDisabled = true
+  enableEventListener = () => this.eventListenerDisabled = false
+
   startEventListener = async () => {
+    if (this.eventListenerDisabled) return
     this.contract.on(this.contract.filters[this.filterName as string](), async (...args) => {
       const e = args[args.length - 1] as EventLog
       console.log("New event detected", e)
