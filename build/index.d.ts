@@ -32,13 +32,13 @@ declare abstract class IndexerBase<TypedContract extends BaseContract, EventLog,
 export declare abstract class Indexer<TypedContract extends BaseContract, EventLog, DbInputType = any> extends IndexerBase<TypedContract, EventLog, DbInputType> {
     static initialIndexStatus: InitialIndexStatus;
     client: ClientBase | Pool;
-    getProvider: (() => Provider);
+    getProvider: (() => Provider | WebSocketProvider);
     private static inactivityMonitor;
     static initDb: (client: ClientBase | Pool) => Promise<void>;
     contract: BaseContract;
     settings?: IndexerSettings;
     defaultIndexInterval: number;
-    constructor(contract: BaseContract, connectAndGetProvider: () => Provider, client: ClientBase | Pool, settings?: IndexerSettings);
+    constructor(contract: BaseContract, connectAndGetProvider: () => Provider | WebSocketProvider, client: ClientBase | Pool, settings?: IndexerSettings);
     index(): Promise<void>;
     private getTask;
     getIndexerId: (contractAddress: string) => string;
