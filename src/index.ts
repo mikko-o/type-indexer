@@ -112,7 +112,7 @@ abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInput
 export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbInputType = any> extends IndexerBase<TypedContract, EventLog, DbInputType> {
   static initialIndexStatus = new InitialIndexStatus()
   client: ClientBase | Pool
-  getProvider: (() => Provider)
+  getProvider: (() => Provider | WebSocketProvider)
   private static inactivityMonitor = new InactivityMonitor(1000 * 60 * 10)
   static initDb = async (client: ClientBase | Pool) => {
     // create indexer tables
@@ -125,7 +125,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
 
   defaultIndexInterval = 30 * 1000
 
-  constructor(contract: BaseContract, connectAndGetProvider: () => Provider, client: ClientBase | Pool, settings?: IndexerSettings) {
+  constructor(contract: BaseContract, connectAndGetProvider: () => Provider | WebSocketProvider, client: ClientBase | Pool, settings?: IndexerSettings) {
     super()
     this.contract = contract
     this.settings = settings
