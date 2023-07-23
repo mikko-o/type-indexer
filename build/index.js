@@ -320,6 +320,10 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                     case 4:
                         _j.sent();
                         //if (this.startEventListener) this.startEventListener()
+                        return [4 /*yield*/, (0, utils_1.sleep)(3000)];
+                    case 5:
+                        //if (this.startEventListener) this.startEventListener()
+                        _j.sent();
                         this.startEventListener();
                         indexPeriodically = function () { return __awaiter(_this, void 0, void 0, function () {
                             var address, startTs, task, endTs, duration, wait;
