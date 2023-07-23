@@ -168,7 +168,6 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     await _index(this.getProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
 
     //if (this.startEventListener) this.startEventListener()
-    await sleep(3000)
     this.startEventListener()
 
     // Periodically index with query filter
