@@ -100,8 +100,6 @@ abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInput
   abstract store: (data: Array<DbInputType>) => Promise<void>
   // Will run at the end of each batch of blocks indexed 
   //abstract onIndexEnd: () => Promise<void>
-  // An optional event listener which will start when previous blocks have been indexed
-  //abstract startEventListener?: () => void | Promise<void>
   // Should be defined to clear any temporary data allocated when indexing a batch of blocks
   // abstract clearState: () => void
 
@@ -133,7 +131,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     this.client = client
   }
 
-  startEventListener = () => {
+  startEventListener = async () => {
     this.contract.on(this.contract.filters[this.filterName as string](), async (...args) => {
       const e = args[args.length - 1] as EventLog
       console.log("New event detected", e)
@@ -204,7 +202,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     try {
       // Reconnect to make sure the connection is alive
       const provider = this.getProvider()
-      const contract = this.contract.connect({ provider })
+      const contract = this.contract.connect(provider)
       const filter = contract.filters[this.filterName as string]()
       const events = await contract.queryFilter(filter, start, end) as EventLog[]
       //console.log(c.address, events.length)
