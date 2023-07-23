@@ -39,7 +39,7 @@ export declare abstract class Indexer<TypedContract extends BaseContract, EventL
     settings?: IndexerSettings;
     defaultIndexInterval: number;
     constructor(contract: BaseContract, connectAndGetProvider: () => Provider | WebSocketProvider, client: ClientBase | Pool, settings?: IndexerSettings);
-    startEventListener: () => void;
+    startEventListener: () => Promise<void>;
     index(): Promise<void>;
     private getTask;
     getIndexerId: (contractAddress: string) => string;

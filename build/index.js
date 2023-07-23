@@ -159,31 +159,35 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
     function Indexer(contract, connectAndGetProvider, client, settings) {
         var _this = _super.call(this) || this;
         _this.defaultIndexInterval = 30 * 1000;
-        _this.startEventListener = function () {
-            _this.contract.on(_this.contract.filters[_this.filterName](), function () {
-                var args = [];
-                for (var _i = 0; _i < arguments.length; _i++) {
-                    args[_i] = arguments[_i];
-                }
-                return __awaiter(_this, void 0, void 0, function () {
-                    var e, data;
-                    return __generator(this, function (_b) {
-                        switch (_b.label) {
-                            case 0:
-                                e = args[args.length - 1];
-                                console.log("New event detected", e);
-                                return [4 /*yield*/, this.processEvent(e)];
-                            case 1:
-                                data = _b.sent();
-                                return [4 /*yield*/, this.store([data])];
-                            case 2:
-                                _b.sent();
-                                return [2 /*return*/];
-                        }
+        _this.startEventListener = function () { return __awaiter(_this, void 0, void 0, function () {
+            var _this = this;
+            return __generator(this, function (_b) {
+                this.contract.on(this.contract.filters[this.filterName](), function () {
+                    var args = [];
+                    for (var _i = 0; _i < arguments.length; _i++) {
+                        args[_i] = arguments[_i];
+                    }
+                    return __awaiter(_this, void 0, void 0, function () {
+                        var e, data;
+                        return __generator(this, function (_b) {
+                            switch (_b.label) {
+                                case 0:
+                                    e = args[args.length - 1];
+                                    console.log("New event detected", e);
+                                    return [4 /*yield*/, this.processEvent(e)];
+                                case 1:
+                                    data = _b.sent();
+                                    return [4 /*yield*/, this.store([data])];
+                                case 2:
+                                    _b.sent();
+                                    return [2 /*return*/];
+                            }
+                        });
                     });
                 });
+                return [2 /*return*/];
             });
-        };
+        }); };
         _this.getTask = function () { return function (start, end) { return __awaiter(_this, void 0, void 0, function () {
             var provider, contract, filter, events, output, e_1;
             var _this = this;
@@ -192,7 +196,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                     case 0:
                         _b.trys.push([0, 4, , 5]);
                         provider = this.getProvider();
-                        contract = this.contract.connect({ provider: provider });
+                        contract = this.contract.connect(provider);
                         filter = contract.filters[this.filterName]();
                         return [4 /*yield*/, contract.queryFilter(filter, start, end)];
                     case 1:
