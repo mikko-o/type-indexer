@@ -179,10 +179,10 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                                 case 0:
                                     e = args[args.length - 1];
                                     console.log("New event detected", e);
-                                    return [4 /*yield*/, this.processEvent(e)];
+                                    return [4 /*yield*/, this.processEvent(e, true)];
                                 case 1:
                                     data = _b.sent();
-                                    return [4 /*yield*/, this.store([data])];
+                                    return [4 /*yield*/, this.store([data], true)];
                                 case 2:
                                     _b.sent();
                                     return [2 /*return*/];
@@ -206,10 +206,10 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                         return [4 /*yield*/, contract.queryFilter(filter, start, end)];
                     case 1:
                         events = _b.sent();
-                        return [4 /*yield*/, Promise.all(events.map(function (e) { return _this.processEvent(e); }))];
+                        return [4 /*yield*/, Promise.all(events.map(function (e) { return _this.processEvent(e, false); }))];
                     case 2:
                         output = _b.sent();
-                        return [4 /*yield*/, this.store(output)
+                        return [4 /*yield*/, this.store(output, false)
                             /*
                             await Promise.all(
                               Object.entries(this.filters).map(async ([filterKey, onEvent]) => {

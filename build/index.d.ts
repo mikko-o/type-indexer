@@ -25,8 +25,8 @@ declare class InitialIndexStatus {
 }
 declare abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInputType> {
     abstract filterName: keyof TypedContract['filters'];
-    abstract processEvent: (e: EventLog) => DbInputType;
-    abstract store: (data: Array<DbInputType>) => Promise<void>;
+    abstract processEvent: (e: EventLog, isEventListener?: boolean) => DbInputType;
+    abstract store: (data: Array<DbInputType>, isEventListener?: boolean) => Promise<void>;
     abstract name: string;
 }
 export declare abstract class Indexer<TypedContract extends BaseContract, EventLog, DbInputType = any> extends IndexerBase<TypedContract, EventLog, DbInputType> {
