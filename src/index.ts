@@ -133,6 +133,15 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     this.client = client
   }
 
+  startEventListener = () => {
+    this.contract.on(this.contract.filters[this.filterName as string](), async (...args) => {
+      const e = args[args.length - 1] as EventLog
+      console.log("New event detected", e)
+      const data = await this.processEvent(e)
+      await this.store([data])
+    })
+  }
+
   async index() {
     const address = await this.contract.getAddress()
 
@@ -161,6 +170,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     await _index(this.getProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
 
     //if (this.startEventListener) this.startEventListener()
+    this.startEventListener()
 
     // Periodically index with query filter
     // Only the indexer should update last indexed block (not the listener)
