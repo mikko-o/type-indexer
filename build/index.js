@@ -156,7 +156,7 @@ var IndexerBase = /** @class */ (function () {
 }());
 var Indexer = exports.Indexer = /** @class */ (function (_super) {
     __extends(Indexer, _super);
-    function Indexer(contract, settings) {
+    function Indexer(contract, connectAndGetProvider, client, settings) {
         var _this = _super.call(this) || this;
         _this.defaultIndexInterval = 30 * 1000;
         _this.getTask = function () { return function (start, end) { return __awaiter(_this, void 0, void 0, function () {
@@ -166,7 +166,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                 switch (_b.label) {
                     case 0:
                         _b.trys.push([0, 4, , 5]);
-                        provider = Indexer.connectAndGetProvider();
+                        provider = this.getProvider();
                         contract = this.contract.connect({ provider: provider });
                         filter = contract.filters[this.filterName]();
                         return [4 /*yield*/, contract.queryFilter(filter, start, end)];
@@ -237,20 +237,12 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                 }
             });
         }); };
-        if (!Indexer.client || !Indexer.connectProvider) {
-            throw new Error('Uninitialized');
-        }
         _this.contract = contract;
         _this.settings = settings;
+        _this.getProvider = connectAndGetProvider;
+        _this.client = client;
         return _this;
     }
-    Object.defineProperty(Indexer.prototype, "client", {
-        get: function () {
-            return Indexer.getClient();
-        },
-        enumerable: false,
-        configurable: true
-    });
     Indexer.prototype.index = function () {
         var _b, _c, _d, _e, _f, _g, _h;
         return __awaiter(this, void 0, void 0, function () {
@@ -293,7 +285,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                     case 3:
                         console.log("\n".concat(((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer') + ' ' + address, ": indexing from block ").concat(start));
                         initialTask = this.getTask();
-                        return [4 /*yield*/, _index(Indexer.connectAndGetProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, initialTask, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })
+                        return [4 /*yield*/, _index(this.getProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, initialTask, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })
                             //if (this.startEventListener) this.startEventListener()
                             // Periodically index with query filter
                             // Only the indexer should update last indexed block (not the listener)
@@ -322,7 +314,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
                                         start = _l.sent();
                                         console.log("\n".concat(((_d = this.name) !== null && _d !== void 0 ? _d : 'Unnamed indexer') + ' ' + address, ": indexing from block ").concat(start));
                                         task = this.getTask();
-                                        return [4 /*yield*/, _index(Indexer.connectAndGetProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, task, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })];
+                                        return [4 /*yield*/, _index(this.getProvider(), start, (_f = (_e = this.settings) === null || _e === void 0 ? void 0 : _e.batchSize) !== null && _f !== void 0 ? _f : 50000, task, onEnd, { checkpointInterval: (_g = this.settings) === null || _g === void 0 ? void 0 : _g.checkpointInterval, progressReportInterval: (_h = this.settings) === null || _h === void 0 ? void 0 : _h.progressReportInterval })];
                                     case 6:
                                         _l.sent();
                                         endTs = Number(new Date());
@@ -345,35 +337,20 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
     var _a;
     _a = Indexer;
     Indexer.initialIndexStatus = new InitialIndexStatus();
-    Indexer.client = undefined;
-    Indexer.connectProvider = undefined;
     Indexer.inactivityMonitor = new InactivityMonitor(1000 * 60 * 10);
-    Indexer.setClient = function (c) { _a.client = c; };
-    Indexer.initialize = function (settings) { return __awaiter(void 0, void 0, void 0, function () {
+    Indexer.initDb = function (client) { return __awaiter(void 0, void 0, void 0, function () {
         var create;
         return __generator(_a, function (_b) {
             switch (_b.label) {
                 case 0:
-                    this.client = settings.client;
                     create = (0, fs_1.readFileSync)('src/db/schema.sql', { encoding: 'utf-8' });
-                    return [4 /*yield*/, settings.client.query(create)];
+                    return [4 /*yield*/, client.query(create)];
                 case 1:
                     _b.sent();
-                    this.connectProvider = settings.connectProvider;
                     return [2 /*return*/];
             }
         });
     }); };
-    Indexer.getClient = function () {
-        if (!_a.client)
-            throw new Error("Uninitialized");
-        return _a.client;
-    };
-    Indexer.connectAndGetProvider = function () {
-        if (!_a.connectProvider)
-            throw new Error("Uninitialized");
-        return _a.connectProvider();
-    };
     return Indexer;
 }(IndexerBase));
 /*
