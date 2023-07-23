@@ -96,8 +96,8 @@ class InactivityMonitor {
 //type FiltersBase = { [name: string]: (event: TypedEventLog, contractName: string) => void | Promise<void> }
 abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInputType> {
   abstract filterName: keyof TypedContract['filters']
-  abstract processEvent: (e: EventLog) => DbInputType
-  abstract store: (data: Array<DbInputType>) => Promise<void>
+  abstract processEvent: (e: EventLog, isEventListener?: boolean) => DbInputType
+  abstract store: (data: Array<DbInputType>, isEventListener?: boolean) => Promise<void>
   // Will run at the end of each batch of blocks indexed 
   //abstract onIndexEnd: () => Promise<void>
   // Should be defined to clear any temporary data allocated when indexing a batch of blocks
@@ -140,8 +140,8 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     this.contract.on(this.contract.filters[this.filterName as string](), async (...args) => {
       const e = args[args.length - 1] as EventLog
       console.log("New event detected", e)
-      const data = await this.processEvent(e)
-      await this.store([data])
+      const data = await this.processEvent(e, true)
+      await this.store([data], true)
     })
   }
 
@@ -212,10 +212,10 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
       const events = await contract.queryFilter(filter, start, end) as EventLog[]
       //console.log(c.address, events.length)
       const output = await Promise.all(
-        events.map(e => this.processEvent(e))
+        events.map(e => this.processEvent(e, false))
       )
 
-      await this.store(output)
+      await this.store(output, false)
 
       /*
       await Promise.all(
