@@ -149,7 +149,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     if (start === undefined) {
       //const last = await this.getLastIndexedBlock()
       start = await this.getLastIndexedBlock(address) + 1
-      if (this.settings?.minIndexableBlock && start < this.settings.minIndexableBlock) {
+      if (this.settings?.minIndexableBlock && (start || 0) < this.settings.minIndexableBlock) {
         start = this.settings.minIndexableBlock
       }
     }
