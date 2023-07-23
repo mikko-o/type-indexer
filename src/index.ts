@@ -111,24 +111,13 @@ abstract class IndexerBase<TypedContract extends BaseContract, EventLog, DbInput
 
 export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbInputType = any> extends IndexerBase<TypedContract, EventLog, DbInputType> {
   static initialIndexStatus = new InitialIndexStatus()
-  private static client: ClientBase | Pool | undefined = undefined
-  private static connectProvider: (() => Provider) | undefined = undefined
+  client: ClientBase | Pool
+  getProvider: (() => Provider)
   private static inactivityMonitor = new InactivityMonitor(1000 * 60 * 10)
-  static setClient = (c: ClientBase | Pool) => { this.client = c }
-  static initialize = async (settings: { client: ClientBase | Pool, connectProvider: () => Provider }) => {
-    this.client = settings.client
+  static initDb = async (client: ClientBase | Pool) => {
     // create indexer tables
     const create = readFileSync('src/db/schema.sql', { encoding: 'utf-8' })
-    await settings.client.query(create)
-    this.connectProvider = settings.connectProvider
-  }
-  static getClient = () => {
-    if (!this.client) throw new Error("Uninitialized")
-    return this.client
-  }
-  static connectAndGetProvider = () => {
-    if (!this.connectProvider) throw new Error("Uninitialized")
-    return this.connectProvider()
+    await client.query(create)
   }
 
   contract: BaseContract
@@ -136,17 +125,12 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
 
   defaultIndexInterval = 30 * 1000
 
-  constructor(contract: BaseContract, settings?: IndexerSettings) {
+  constructor(contract: BaseContract, connectAndGetProvider: () => Provider, client: ClientBase | Pool, settings?: IndexerSettings) {
     super()
-    if (!Indexer.client || !Indexer.connectProvider) {
-      throw new Error('Uninitialized')
-    }
     this.contract = contract
     this.settings = settings
-  }
-
-  get client() {
-    return Indexer.getClient()
+    this.getProvider = connectAndGetProvider
+    this.client = client
   }
 
   async index() {
@@ -174,7 +158,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
     //console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
 
     const initialTask = this.getTask()
-    await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
+    await _index(this.getProvider(), start, this.settings?.batchSize ?? 50000, initialTask, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
 
     //if (this.startEventListener) this.startEventListener()
 
@@ -194,7 +178,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
         console.log(`\n${(this.name ?? 'Unnamed indexer') + ' ' + address}: indexing from block ${start}`)
         //console.log(await Promise.all(this.contracts.map(async x => `${(await x.getAddress()).substring(0, 8)}...`).join(', ')))
         const task = this.getTask()
-        await _index(Indexer.connectAndGetProvider(), start, this.settings?.batchSize ?? 50000, task, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
+        await _index(this.getProvider(), start, this.settings?.batchSize ?? 50000, task, onEnd, { checkpointInterval: this.settings?.checkpointInterval, progressReportInterval: this.settings?.progressReportInterval })
 
         const endTs = Number(new Date())
         const duration = endTs - startTs
@@ -209,7 +193,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
   private getTask = (): IndexerTask => async (start, end) => {
     try {
       // Reconnect to make sure the connection is alive
-      const provider = Indexer.connectAndGetProvider()
+      const provider = this.getProvider()
       const contract = this.contract.connect({ provider })
       const filter = contract.filters[this.filterName as string]()
       const events = await contract.queryFilter(filter, start, end) as EventLog[]
