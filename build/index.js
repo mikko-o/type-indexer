@@ -159,9 +159,14 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
     function Indexer(contract, connectAndGetProvider, client, settings) {
         var _this = _super.call(this) || this;
         _this.defaultIndexInterval = 30 * 1000;
+        _this.eventListenerDisabled = false;
+        _this.disableEventListener = function () { return _this.eventListenerDisabled = true; };
+        _this.enableEventListener = function () { return _this.eventListenerDisabled = false; };
         _this.startEventListener = function () { return __awaiter(_this, void 0, void 0, function () {
             var _this = this;
             return __generator(this, function (_b) {
+                if (this.eventListenerDisabled)
+                    return [2 /*return*/];
                 this.contract.on(this.contract.filters[this.filterName](), function () {
                     var args = [];
                     for (var _i = 0; _i < arguments.length; _i++) {
