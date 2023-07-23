@@ -343,7 +343,7 @@ var Indexer = exports.Indexer = /** @class */ (function (_super) {
         return __generator(_a, function (_b) {
             switch (_b.label) {
                 case 0:
-                    create = (0, fs_1.readFileSync)('src/db/schema.sql', { encoding: 'utf-8' });
+                    create = (0, fs_1.readFileSync)('./src/db/indexer_schema.sql', { encoding: 'utf-8' });
                     return [4 /*yield*/, client.query(create)];
                 case 1:
                     _b.sent();

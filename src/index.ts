@@ -116,7 +116,7 @@ export abstract class Indexer<TypedContract extends BaseContract, EventLog, DbIn
   private static inactivityMonitor = new InactivityMonitor(1000 * 60 * 10)
   static initDb = async (client: ClientBase | Pool) => {
     // create indexer tables
-    const create = readFileSync('src/db/schema.sql', { encoding: 'utf-8' })
+    const create = readFileSync('./src/db/indexer_schema.sql', { encoding: 'utf-8' })
     await client.query(create)
   }
 
